@@ -1,35 +1,40 @@
-# Eterna Solana USDC skill
+# Eterna skills for Solana agents
 
-Open agent skill: send **USDC on Solana** from a wallet you control, trade through the [Eterna MCP](https://mcp.eterna.exchange/mcp), and withdraw USDC back to the same Solana address.
+Two open skills an agent can install and follow. They are community skills in the same sense as the list on [solana.com/skills](https://solana.com/skills): useful to drop into an agent, not a Solana Foundation endorsement.
 
-This is a hybrid venue. The Solana transfer is signed by the user's wallet. After it confirms, the balance sits on a **managed trading account**, not in that wallet. It is not a DEX and it is not self-custody after the send.
+| Skill | What it is for | Solana piece |
+| --- | --- | --- |
+| [eterna-solana-usdc](skills/eterna-solana-usdc/SKILL.md) | Send official USDC from a Solana wallet into Eterna, and withdraw USDC back to that wallet | SPL transfer, official mint, Solscan |
+| [eterna-mcp](skills/eterna-mcp/SKILL.md) | Trade on [ai.eterna.exchange](https://ai.eterna.exchange) through the Eterna MCP after the USDC has credited | Uses the balance that arrived from Solana |
+
+The human product is [eterna.exchange](https://eterna.exchange). The agent product is [ai.eterna.exchange](https://ai.eterna.exchange). One skill does not click the website. The Solana skill moves USDC. The MCP skill places the trade.
 
 ## Install
+
+Both skills:
 
 ```bash
 npx skills add https://github.com/EternaHybridExchange/eterna-solana-skill
 ```
 
-The skill directory is `skills/eterna-solana-usdc/`.
+One skill:
 
-## What the agent is allowed to do
+```bash
+npx skills add https://github.com/EternaHybridExchange/eterna-solana-skill --skill eterna-solana-usdc
+npx skills add https://github.com/EternaHybridExchange/eterna-solana-skill --skill eterna-mcp
+```
 
-1. Read a deposit address for `USDC` on chain `SOL`.
-2. Ask the user to sign an SPL transfer of the official USDC mint. No seed, no private key, no MCP token in the chat.
-3. Wait until the deposit status is success, move funds to the trading wallet, convert to USDT (perps are USDT-margined), then place one order the user confirmed.
-4. Withdraw USDC on `SOL` back to the same address, after a second confirmation, if the live minimum and fee allow it.
+Works with agents that read `SKILL.md` (Cursor, Claude Code, Codex, and others supported by the skills CLI).
 
-Generic Solana swaps belong to a Jupiter (or other DEX) skill. This skill starts once the wallet already holds official USDC.
+## What the user signs
 
-## Humans
+The Solana wallet signs the USDC transfer. The agent never asks for a seed or a private key. The MCP token stays in `ETERNA_MCP_TOKEN` and never goes in chat or git.
 
-Create agent access at [ai.eterna.exchange](https://ai.eterna.exchange). Put the bearer token in `ETERNA_MCP_TOKEN`. Never commit it.
-
-Auth details: [eterna-mcp authentication](https://github.com/EternaHybridExchange/eterna-mcp/blob/main/docs/authentication.md).
+After the transfer is credited, the balance is on a managed Eterna trading account. From that moment it is not sitting in the Solana wallet. Withdrawal back to Solana is a separate confirmed step.
 
 ## Limits
 
-Live numbers change. The snapshot and the rule "re-read before sending" are in `skills/eterna-solana-usdc/references/live-limits.md`. A 1 USDC round trip does not clear the withdrawal minimum and fee.
+Numbers move. The snapshot and the rule to re-read them live are in [live-limits.md](skills/eterna-solana-usdc/references/live-limits.md). A 1 USDC send can fund a small trade. A round trip back to Solana needs more than the withdrawal minimum and fee. Start from 5 USDC if the USDC should return.
 
 ## License
 

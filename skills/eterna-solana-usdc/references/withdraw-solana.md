@@ -1,12 +1,19 @@
-# Withdraw USDC back to Solana
+# Withdraw USDC to Solana
 
-Read `live-limits.md` again. Use the live minimum and fee, not the snapshot, if they differ.
+Read `live-limits.md` again. Live minimum and fee win over the snapshot.
 
-## 1. USDT back to USDC
+## 1. Hold USDC, not only USDT
 
-Perp PnL and margin are USDT. `swapToUsdt` only sells into USDT. To leave as USDC, buy USDC on the spot market after the position is closed.
+Perp margin is USDT. `swapToUsdt` sells into USDT. After the position is closed, buy USDC back only if the SDK lists the spot pair.
 
-Search the SDK, then a spot buy (shape from `placeOrder`):
+```typescript
+const info = await eterna.getInstruments("USDCUSDT", "spot");
+return info;
+```
+
+If that list is empty, stop. Do not withdraw a different coin to a Solana USDC address.
+
+When the pair exists, search the SDK and place a spot buy. `qty` is USDT to spend when `marketUnit` is `quoteCoin`:
 
 ```typescript
 const order = await eterna.placeOrder({
@@ -20,27 +27,27 @@ const order = await eterna.placeOrder({
 return order;
 ```
 
-`qty` here is USDT to spend. Confirm the symbol exists via `getInstruments("USDCUSDT", "spot")` or `search_sdk`. If USDC spot is not listed, stop. Do not withdraw USDT to a Solana USDC mint address.
+Confirm that order with the user before sending it.
 
-## 2. Check size
+## 2. Size
 
 ```typescript
 const w = await eterna.getWithdrawableAmount("USDC");
 return w;
 ```
 
-Need `withdrawableAmount` greater than or equal to the live minimum (snapshot: 1 USDC) and enough left that the user still understands the fee (snapshot: 0.3 USDC). If not, say so and do not submit.
+The amount must be at least the live minimum (snapshot: 1 USDC). Tell the user the live fee (snapshot: 0.3 USDC). If the balance is short, stop.
 
 ## 3. Submit
 
-Destination is the same Solana address that signed the deposit, unless the user typed a different base58 address and confirmed it. Reject `0x` addresses.
+Destination is the Solana address that funded the deposit, unless the user typed a different base58 address and confirmed it. Reject `0x`.
 
 ```typescript
 const req = await eterna.submitWithdrawal("USDC", amount, solanaAddress, "SOL");
-return req; // withdrawalRequestId, status
+return req;
 ```
 
-Chain argument is `SOL`, the same code as the deposit.
+Chain is `SOL`.
 
 ## 4. Status
 
@@ -49,6 +56,4 @@ const status = await eterna.getWithdrawalStatus(withdrawalRequestId);
 return status;
 ```
 
-`COMPLETED` is done. `FAILED`, `REVERTED`, or `REVERT_FAILED`: show `errorMessage` and stop. Do not submit a second withdrawal for the same funds until the first request is terminal.
-
-Withdrawal is asynchronous. Do not tell the user the USDC is in Phantom until status is `COMPLETED` or the signature is on Solscan.
+Tell the user the USDC is back only when status is `COMPLETED`. For any other status, show `status` and `errorMessage`. Do not submit a second withdrawal for the same funds while the first request is still open.

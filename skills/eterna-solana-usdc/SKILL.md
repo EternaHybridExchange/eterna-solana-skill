@@ -1,91 +1,65 @@
 ---
 name: eterna-solana-usdc
 description: >
-  Use when the user wants an agent to deposit USDC on Solana and trade through
-  Eterna MCP (ai.eterna.exchange), or withdraw that USDC back to the same
-  Solana address. Triggers: "deposit USDC on Solana to Eterna", "fund Eterna
-  from Phantom", "trade on Eterna with Solana USDC", "withdraw Eterna USDC to
-  Solana". Do not use for generic Solana swaps, Jupiter routes, or DEX perps
-  (Drift, Raydium, Orca). Do not use when the user only wants to build a
-  Solana program.
+  Use when the user wants to deposit official Solana USDC into Eterna from a
+  wallet they sign, or withdraw Eterna USDC back to a Solana address. Triggers:
+  "deposit USDC on Solana to Eterna", "fund Eterna from Phantom", "withdraw
+  Eterna USDC to Solana". Do not use for generic Solana swaps or on-chain DEX
+  perps. For orders after the deposit credits, use the eterna-mcp skill.
 license: MIT
 metadata:
   author: EternaHybridExchange
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
-# Eterna: Solana USDC in, MCP trade, USDC out
+# Eterna Solana USDC
 
-## Custody (read this first)
+Move official Solana USDC between a user-signed wallet and Eterna. Trading after the credit is the `eterna-mcp` skill, not this one.
 
-Eterna is a hybrid exchange. The user signs a Solana SPL transfer from their own wallet. After the venue credits it, the balance is on a **managed trading account** (a custodial sub-account). It is not a DEX. The agent cannot move those funds except through the MCP methods below, and only after the user confirms each spend and each withdrawal.
+## Custody
 
-Do not describe this as self-custody, on-chain perps, or a decentralized exchange.
+The user signs the Solana transfer. After Eterna credits it, the balance is on a managed trading account. It is not in the Solana wallet anymore. Say that before the user signs. Withdrawal is a later step, with its own confirmation.
 
 ## When to use
 
-- The wallet already holds official Solana USDC, or the user is ready to send it.
-- The user wants that USDC on Eterna and then a trade through MCP.
-- The user wants USDC withdrawn back to a Solana address.
+- The wallet holds official Solana USDC, or the user will send it.
+- The user wants that USDC on Eterna.
+- The user wants USDC withdrawn to a Solana address.
 
 ## When not to use
 
-- The user said buy, sell, or swap on Solana and did not name Eterna. Use a Jupiter (or other DEX) skill. If they hold SOL and need USDC first, that swap happens there, into the official mint, and only then this skill starts.
-- The user wants Drift, Raydium, Orca, or any fully on-chain perp.
-- The task is "write a Solana program" or "set up Anchor".
+- The user wants a Solana swap and did not name Eterna. Use a Jupiter skill. If they hold SOL, swap to the official USDC mint there first.
+- The user wants an on-chain perp (Drift and similar). This skill does not open those positions.
+- The user wants to place an Eterna order. Switch to `eterna-mcp` once deposit status is success.
 
 ## Never
 
-- Ask for a seed phrase, private key, or keypair file. The wallet signs. You prepare the transfer or you show the address and amount for the user to send.
-- Paste `ETERNA_MCP_TOKEN` or any bearer token into the chat, the skill, or a commit.
-- Send any mint other than official USDC. The mint check is in `references/live-limits.md`.
-- Send on Arbitrum, Ethereum, or any chain other than Solana for this skill. Ignore older MCP examples that default to USDT on Arbitrum.
-- Add a Solana memo when `tagDeposit` is empty. If `tagDeposit` is non-empty, **stop and do not send**. This product path does not attach a memo on Solana. A required tag that you drop will not be credited.
-- Place an order or call `swapToUsdt` before deposit `status` is `3`.
-- Withdraw to an address that starts with `0x`. Solana addresses are base58.
-- Promise that the same number of USDC comes back. There is a withdrawal fee, a minimum, and a USDC to USDT conversion for perps.
+- Ask for a seed phrase, private key, or keypair file.
+- Put `ETERNA_MCP_TOKEN` or any bearer token in the chat or in a file you commit.
+- Send any mint other than the official USDC mint in `references/live-limits.md`.
+- Send on a chain other than Solana. Coin is `USDC`. Chain code is `SOL`.
+- Add a memo when `tagDeposit` is empty. If `tagDeposit` is non-empty, stop and do not send.
+- Pick an older deposit row because it is also on SOL. Match the signature.
+- Withdraw to an address that starts with `0x`.
+- Promise the same USDC amount back. There is a live minimum and a fee.
 
-## Two confirmations
+## Confirm before signing or withdrawing
 
-Show this and wait for an explicit yes before the matching action:
+Wait for an explicit yes:
 
-1. **Before the SPL transfer:** mint, destination address, amount (USDC and base units), chain `Solana`, and the sentence "after this send, funds are on a managed Eterna account."
-2. **Before `placeOrder`:** symbol, side, qty, leverage, and that margin is USDT.
-3. **Before `submitWithdrawal`:** coin `USDC`, chain `SOL`, destination, amount, and the live fee and minimum. Skip the withdrawal if the amount is below the live minimum.
+1. **SPL transfer:** mint, destination, amount in USDC and in base units, chain Solana, and that the credited balance will sit on a managed Eterna account.
+2. **Withdrawal:** coin `USDC`, chain `SOL`, destination, amount, live minimum, live fee. Do not submit if the amount is below the live minimum.
 
-## Golden path
-
-Read a reference only when that step starts.
+## Steps
 
 | Step | Read |
 | --- | --- |
-| Limits, mint, memo rule, why 1 USDC cannot round-trip | `references/live-limits.md` |
-| Deposit address, SPL transfer, poll until credited | `references/deposit-solana.md` |
-| Funding to trading, USDC to USDT, one confirmed order, close | `references/mcp-trade.md` |
-| USDC back to the same Solana address | `references/withdraw-solana.md` |
+| Mint, minimums, memo, polling | `references/live-limits.md` |
+| Deposit address, transfer, poll | `references/deposit-solana.md` |
+| USDC back to Solana | `references/withdraw-solana.md` |
 
-## Connect MCP
-
-Human creates access at https://ai.eterna.exchange. Token stays in the environment as `ETERNA_MCP_TOKEN`.
-
-```json
-{
-  "mcpServers": {
-    "eterna": {
-      "type": "streamable-http",
-      "url": "https://mcp.eterna.exchange/mcp",
-      "headers": {
-        "Authorization": "Bearer ${ETERNA_MCP_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-Auth reference: https://github.com/EternaHybridExchange/eterna-mcp/blob/main/docs/authentication.md
-
-Inside MCP, call `search_sdk` before writing code, then `execute_code` with the `eterna.*` SDK. On an infrastructure error, report it. Do not invent a retry loop.
+MCP connection and orders: skill `eterna-mcp` in this repo.
 
 ## Demo size
 
-Use at least 5 USDC if the user wants funds back on Solana. Live withdrawal minimum is higher than a 1 USDC send once the fee is included. Re-read limits before quoting a number. Details: `references/live-limits.md`.
+At least 5 USDC if the user wants USDC back on Solana. Re-read `references/live-limits.md` before quoting a figure.

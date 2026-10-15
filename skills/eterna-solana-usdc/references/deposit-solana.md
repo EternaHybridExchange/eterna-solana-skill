@@ -1,32 +1,35 @@
 # Deposit USDC on Solana
 
-Read `live-limits.md` first.
+Read `live-limits.md` first. You need the MCP from the `eterna-mcp` skill only to read the deposit address and the deposit rows. The wallet still signs the transfer.
 
 ## 1. Address
 
 ```typescript
 const addr = await eterna.getDepositAddress("USDC", "SOL");
-return addr; // chains.addressDeposit, chains.tagDeposit, chains.chainType
+return addr;
 ```
 
-`chainType` must be the Solana chain. If it is not `SOL`, stop.
+Read `addressDeposit` and `tagDeposit` from `addr.chains`. If `chains` is a list, use the entry for chain `SOL`.
 
-Apply the memo rule in `live-limits.md` before building a transaction.
+Stop if `addressDeposit` is missing or starts with `0x`.
+
+Memo rule from `live-limits.md`: empty tag means a plain SPL transfer. A non-empty tag means stop.
 
 ## 2. Transfer
 
 The user signs. You never hold the key.
 
-Build a single SPL token transfer:
+One SPL token transfer:
 
-- Mint: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
-- Destination: `addressDeposit` (the token account owner is that address; create the associated token account if the venue address has none)
-- Amount: integer base units. 6 decimals. `1.5` USDC is `1500000`. Do not use floating point to compute the integer.
-- No memo instruction when `tagDeposit` is empty.
+- Mint: the official USDC mint in `live-limits.md`
+- Destination owner: `addressDeposit`
+- If that owner has no USDC token account yet, the user can create the associated token account in the same transaction and pay the rent
+- Amount: integer base units, 6 decimals. `1.5` USDC is `1500000`. Compute the integer from a decimal string. Do not use binary floating point
+- No memo instruction when the tag is empty
 
-Prefer `@solana/kit` (or the user's wallet adapter) over legacy `@solana/web3.js` examples that load a secret key. If you cannot build the transaction in this session, show mint, destination, amount, and chain, and let the user send from Phantom or another wallet they already unlocked. Do not ask them to export a key so you can send it.
+Prefer `@solana/kit` or the user's wallet. Do not load a secret key. If you cannot build the transaction here, show mint, destination, amount, and chain, and let the user send from a wallet they already unlocked.
 
-Show the confirmation block from `SKILL.md` and wait.
+Show the confirmation from `SKILL.md` and wait.
 
 After broadcast, give `https://solscan.io/tx/<signature>`.
 
@@ -34,12 +37,16 @@ After broadcast, give `https://solscan.io/tx/<signature>`.
 
 ```typescript
 const records = await eterna.getDepositRecords("USDC");
-const row = records.rows.find((r) => r.txID === signature || r.chain === "SOL");
-return row ? { status: row.status, amount: row.amount, txID: row.txID } : null;
+const row = records.rows.find((r) => r.txID === signature);
+return row
+  ? { status: row.status, amount: row.amount, txID: row.txID, chain: row.chain }
+  : null;
 ```
 
-Match on `txID` when you have the signature. Do not treat an older SOL row as this deposit.
+Match `txID` to the Solana signature only. A missing row means "not visible yet", not "pick another SOL deposit".
 
-Loop until `status === 3` or `status === 4`. Between polls, wait with backoff (start at a few seconds, cap around 30 seconds). A fixed short sleep is not a credit.
+Repeat until `status` is `3` or `4`. Wait between polls, starting at a few seconds and capping around 30 seconds. Do not use one fixed sleep as proof of credit.
 
-Deposits land in the **funding** wallet, not the trading wallet. Do not call `placeOrder` in this step.
+`3` is success. `4` is failed: stop.
+
+The credit lands in the funding wallet. Do not place an order in this step. Hand off to `eterna-mcp`.
