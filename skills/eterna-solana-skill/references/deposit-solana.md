@@ -1,6 +1,6 @@
 # Deposit USDC on Solana
 
-Read `live-limits.md` first. You need the MCP from the `eterna-mcp` skill only to read the deposit address and the deposit rows. The wallet still signs the transfer.
+Read `live-limits.md` first. Use the Eterna MCP to read the deposit address and deposit rows. The wallet still signs the transfer.
 
 ## 1. Address
 
@@ -49,4 +49,4 @@ Repeat until `status` is `3` or `4`. Wait between polls, starting at a few secon
 
 `3` is success. `4` is failed: stop.
 
-The credit lands in the funding wallet. Do not place an order in this step. Hand off to `eterna-mcp`.
+The credit lands in the funding wallet. Do not place an order in this step. When the user wants to trade, continue with `references/trade.md`.

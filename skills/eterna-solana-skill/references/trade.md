@@ -1,6 +1,6 @@
 # Trade after USDC has credited
 
-Only after `eterna-solana-usdc` reports deposit status `3`, or the user already has a trading balance.
+Only after deposit status `3` for the Solana transfer, or the user already has a trading balance.
 
 Call `search_sdk` before `execute_code`. If the live signature differs from this note, follow the search result.
 
@@ -61,3 +61,5 @@ return closed;
 ## 4. Errors
 
 Report infrastructure and connection errors as-is. Do not invent a second order to "fix" them. If `search_sdk` is empty, stop.
+
+To send USDC back to Solana, read `references/withdraw-solana.md`.
